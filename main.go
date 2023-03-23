@@ -128,7 +128,7 @@ func payload(msgs *[]message, role, input string) ([]byte, error) {
 		err error
 	)
 
-	msg = message{Role: "user", Content: input}
+	msg = message{Role: role, Content: input}
 	*msgs = append(*msgs, msg)
 	b = body{Model: "gpt-3.5-turbo", Messages: msgs}
 	s, err = json.Marshal(&b)
