@@ -64,8 +64,11 @@ func run() error {
 }
 
 func loop(key string) error {
-	msgs := make([]message, 0, 2)
-	quit := make(chan struct{})
+	var (
+		msgs = make([]message, 0, 2)
+		quit = make(chan struct{})
+	)
+
 	fmt.Println("enter your question, and type ENTER")
 
 	for {
