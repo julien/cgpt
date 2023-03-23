@@ -160,7 +160,7 @@ func fetch(req *http.Request) (*response, error) {
 		err    error
 	)
 
-	client = http.Client{Timeout: 2 * time.Minute}
+	client = http.Client{}
 	res, err = client.Do(req)
 	if err != nil {
 		return nil, err
