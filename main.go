@@ -180,7 +180,7 @@ func spinner(delay time.Duration, quit <-chan struct{}) {
 		case <-t.C:
 			for _, r := range `-\|/` {
 				fmt.Printf("\r%c", r)
-				time.Sleep(delay)
+				time.Sleep(delay / 2)
 			}
 		}
 	}
