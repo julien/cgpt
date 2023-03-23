@@ -65,8 +65,9 @@ func run() error {
 
 func loop(key string) error {
 	var (
-		msgs = make([]message, 0, 2)
-		quit = make(chan struct{})
+		msgs   = make([]message, 0, 2)
+		quit   = make(chan struct{})
+		client = http.DefaultClient
 	)
 
 	fmt.Println("enter your question, and type ENTER")
@@ -89,7 +90,7 @@ func loop(key string) error {
 		}
 
 		go spinner(100*time.Millisecond, quit)
-		resp, err := fetch(req)
+		resp, err := fetch(client, req)
 		quit <- struct{}{}
 		if err != nil {
 			return errors.New("couldn't fetch results")
@@ -155,15 +156,13 @@ func request(payload []byte, key string) (*http.Request, error) {
 	return req, nil
 }
 
-func fetch(req *http.Request) (*response, error) {
+func fetch(client *http.Client, req *http.Request) (*response, error) {
 	var (
-		client http.Client
-		res    *http.Response
-		data   response
-		err    error
+		res  *http.Response
+		data response
+		err  error
 	)
 
-	client = http.Client{}
 	res, err = client.Do(req)
 	if err != nil {
 		return nil, err
