@@ -1,94 +1,187 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
-	"strings"
 	"time"
 )
 
 const (
 	openAPIKey = "OPENAPI_KEY"
 	url        = "https://api.openai.com/v1/chat/completions"
-	usage      = "usage: cgpt PROMPT\nwhere PROMPT is the question you want to ask\n"
 )
 
 type (
+	body struct {
+		Model    string     `json:"model"`
+		Messages *[]message `json:"messages"`
+	}
+
 	response struct {
+		ID      string    `json:"id"`
+		Object  string    `json:"object"`
+		Model   string    `json:"model"`
+		Usage   usage     `json:"usage"`
 		Choices []choices `json:"choices"`
 	}
 
+	usage struct {
+		PromptTokens     int32 `json:"prompt_tokens"`
+		CompletionTokens int32 `json:"completion_tokens"`
+		TotalTokens      int32 `json:"total_tokens"`
+	}
+
 	choices struct {
-		Message message `json:"message"`
+		Message      message `json:"message"`
+		FinishReason string  `json:"finish_reason"`
+		Index        int     `json:"index"`
 	}
 
 	message struct {
+		Role    string `json:"role"`
 		Content string `json:"content"`
 	}
 )
 
 func main() {
+	if err := run(); err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+func run() error {
+	key := os.Getenv(openAPIKey)
+	if len(key) == 0 {
+		return errors.New("the environment variable OPENAI_KEY is not set")
+	}
+	return loop(key)
+}
+
+func loop(key string) error {
+	msgs := make([]message, 0, 2)
+	quit := make(chan struct{})
+	fmt.Println("enter your question, and type ENTER")
+
+	for {
+		txt, err := input()
+		if err != nil {
+			return errors.New("couldn't scan user input")
+		}
+
+		b, err := payload(&msgs, "user", txt)
+		if err != nil {
+			return errors.New("couldn't generate payload")
+		}
+
+		req, err := request(b, key)
+
+		if err != nil {
+			return errors.New("couldn't generate request")
+		}
+
+		go spinner(100*time.Millisecond, quit)
+		resp, err := fetch(req)
+		quit <- struct{}{}
+		if err != nil {
+			return errors.New("couldn't fetch results")
+		}
+
+		c := resp.Choices[0].Message.Content
+		fmt.Printf("%s\n\n", c)
+
+		b, err = payload(&msgs, resp.Choices[0].Message.Role, c)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "couldn't update conversation: %v\n", err)
+			break
+		}
+	}
+	return nil
+}
+
+func input() (string, error) {
+	fmt.Print("> ")
+
+	scanner := bufio.NewScanner(os.Stdin)
+	scanner.Scan()
+
+	if err := scanner.Err(); err != nil {
+		return "", err
+	}
+	return scanner.Text(), nil
+}
+
+func payload(msgs *[]message, role, input string) ([]byte, error) {
 	var (
-		prompt string
-		key    string
-		body   string
-		reader *bytes.Reader
-		req    *http.Request
-		client http.Client
-		res    *http.Response
-		data   response
+		msg message
+		b   body
+		s   []byte
+		err error
 	)
 
-	if len(os.Args) < 2 {
-		fmt.Fprintf(os.Stderr, usage)
-		os.Exit(1)
-	}
-
-	prompt = strings.Join(os.Args[1:], " ")
-
-	key = os.Getenv(openAPIKey)
-	if len(key) == 0 {
-		fmt.Fprintf(os.Stderr, "you need to set the %s environment variable before usage\n", openAPIKey)
-		os.Exit(1)
-	}
-
-	body = `{
-		"model": "gpt-3.5-turbo",
-		"messages": [{"role": "user", "content": "` + prompt + `"}]
-	}`
-	reader = bytes.NewReader([]byte(body))
-	req, err := http.NewRequest(http.MethodPost, url, reader)
+	msg = message{Role: "user", Content: input}
+	*msgs = append(*msgs, msg)
+	b = body{Model: "gpt-3.5-turbo", Messages: msgs}
+	s, err = json.Marshal(&b)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "couldn't make request: %v\n", err)
-		os.Exit(1)
+		return nil, err
+	}
+	return s, err
+}
+
+func request(payload []byte, key string) (*http.Request, error) {
+	var (
+		reader *bytes.Reader
+		req    *http.Request
+		err    error
+	)
+
+	reader = bytes.NewReader(payload)
+	req, err = http.NewRequest(http.MethodPost, url, reader)
+	if err != nil {
+		return nil, err
 	}
 	req.Header.Set("Authorization", "Bearer "+key)
 	req.Header.Set("Content-Type", "application/json")
 
-	go spinner(100 * time.Millisecond)
-
-	client = http.Client{Timeout: 30 * time.Second}
-	res, err = client.Do(req)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "request error: %v\n", err)
-		os.Exit(1)
-	}
-	if err := json.NewDecoder(res.Body).Decode(&data); err != nil {
-		fmt.Fprintf(os.Stderr, "couldn't read response: %v\n", err)
-		os.Exit(1)
-	}
-	fmt.Printf("%s\n", data.Choices[0].Message.Content)
-	os.Exit(0)
+	return req, nil
 }
 
-func spinner(delay time.Duration) {
+func fetch(req *http.Request) (*response, error) {
+	var (
+		client http.Client
+		res    *http.Response
+		data   response
+		err    error
+	)
+
+	client = http.Client{Timeout: 2 * time.Minute}
+	res, err = client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	if err := json.NewDecoder(res.Body).Decode(&data); err != nil {
+		return nil, err
+	}
+	return &data, nil
+}
+
+func spinner(delay time.Duration, quit <-chan struct{}) {
+	t := time.NewTicker(delay)
 	for {
-		for _, r := range `-\|/` {
-			fmt.Printf("\r%c", r)
-			time.Sleep(delay)
+		select {
+		case <-quit:
+			return
+		case <-t.C:
+			for _, r := range `-\|/` {
+				fmt.Printf("\r%c", r)
+				time.Sleep(delay)
+			}
 		}
 	}
 }
