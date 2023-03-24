@@ -74,7 +74,7 @@ func loop(key string) error {
 	fmt.Println("enter your question, and type ENTER")
 
 	for {
-		txt, err := input()
+		txt, err := input(os.Stdin)
 		if err != nil {
 			return errors.New("couldn't scan user input")
 		}
@@ -109,10 +109,10 @@ func loop(key string) error {
 	return nil
 }
 
-func input() (string, error) {
+func input(w io.Reader) (string, error) {
 	fmt.Print("> ")
 
-	scanner := bufio.NewScanner(os.Stdin)
+	scanner := bufio.NewScanner(w)
 	scanner.Scan()
 
 	if err := scanner.Err(); err != nil {
