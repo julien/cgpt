@@ -6,14 +6,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"time"
 )
 
 const (
-	openAPIKey = "OPENAPI_KEY"
-	url        = "https://api.openai.com/v1/chat/completions"
+	openAIKey = "OPENAPI_KEY"
+	url       = "https://api.openai.com/v1/chat/completions"
 )
 
 type (
@@ -56,7 +57,7 @@ func main() {
 }
 
 func run() error {
-	key := os.Getenv(openAPIKey)
+	key := os.Getenv(openAIKey)
 	if len(key) == 0 {
 		return errors.New("the environment variable OPENAI_KEY is not set")
 	}
