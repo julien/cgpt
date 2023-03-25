@@ -78,7 +78,7 @@ func main() {
 
 func run(cfg config) error {
 	if len(cfg.key) == 0 {
-		return errors.New("the environment variable OPENAI_KEY is not set")
+		return errors.New("the OPENAI_KEY environment variable is not set")
 	}
 	return loop(cfg)
 }
