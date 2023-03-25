@@ -14,8 +14,8 @@ import (
 )
 
 const (
-	openAIKey = "OPENAI_KEY"
-	url       = "https://api.openai.com/v1/chat/completions"
+	key = "OPENAI_API_KEY"
+	url = "https://api.openai.com/v1/chat/completions"
 )
 
 type (
@@ -66,7 +66,7 @@ func main() {
 	cfg := config{
 		client: http.DefaultClient,
 		ctx:    context.Background(),
-		key:    os.Getenv(openAIKey),
+		key:    os.Getenv(key),
 		input:  os.Stdin,
 	}
 

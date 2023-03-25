@@ -146,7 +146,7 @@ func TestRequest(t *testing.T) {
 				t.Errorf("unexpected error: %v", err)
 			}
 
-			r, err := request(&mockClient{doFn: tc.doFn}, b, os.Getenv(openAIKey))
+			r, err := request(&mockClient{doFn: tc.doFn}, b, os.Getenv(key))
 			if err != nil && !tc.fail {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -171,7 +171,7 @@ func TestRun(t *testing.T) {
 		},
 		{
 			cfg: config{
-				key: os.Getenv(openAIKey),
+				key: os.Getenv(key),
 				ctx: func() context.Context {
 					ctx, cancelFunc := context.WithTimeout(context.Background(), 40*time.Millisecond)
 					defer cancelFunc()
