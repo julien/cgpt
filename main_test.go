@@ -43,7 +43,7 @@ func TestInput(t *testing.T) {
 	}
 
 	for i, tc := range tcs {
-		t.Run(fmt.Sprintf("TestCase%02d", i), func(t *testing.T) {
+		t.Run(fmt.Sprintf("TestCase%02d", i+1), func(t *testing.T) {
 			r := strings.NewReader(tc.s)
 			txt, err := input(r)
 			if err != nil {
@@ -78,7 +78,7 @@ func TestPayload(t *testing.T) {
 	msgs := make([]message, 0, len(tcs))
 
 	for i, tc := range tcs {
-		t.Run(fmt.Sprintf("TestCase%02d", i), func(t *testing.T) {
+		t.Run(fmt.Sprintf("TestCase%02d", i+1), func(t *testing.T) {
 			b, err := payload(&msgs, tc.role, tc.input)
 			if err != tc.err {
 				t.Errorf("got: %v, want: %v", err, tc.err)
@@ -143,7 +143,7 @@ func TestRequest(t *testing.T) {
 	}
 
 	for i, tc := range tcs {
-		t.Run(fmt.Sprintf("TestCase%02d", i), func(t *testing.T) {
+		t.Run(fmt.Sprintf("TestCase%02d", i+1), func(t *testing.T) {
 			msgs := make([]message, 0)
 
 			b, err := payload(&msgs, tc.role, tc.input)
@@ -249,7 +249,7 @@ func TestRun(t *testing.T) {
 	}
 
 	for i, tc := range tcs {
-		t.Run(fmt.Sprintf("TestCase%02d", i), func(t *testing.T) {
+		t.Run(fmt.Sprintf("TestCase%02d", i+1), func(t *testing.T) {
 			err := run(tc.cfg)
 			if err != tc.err {
 				t.Errorf("got: %v, want: %v", err, tc.err)
