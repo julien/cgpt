@@ -88,9 +88,8 @@ func loop(cfg config) error {
 		msgs = make([]message, 0, 2)
 		quit = make(chan struct{})
 	)
+
 	fmt.Println("enter your question, and type ENTER")
-	ctx, cancelFunc := context.WithCancel(cfg.ctx)
-	defer cancelFunc()
 
 	for {
 		fmt.Print("> ")
@@ -104,7 +103,7 @@ func loop(cfg config) error {
 			return errors.New("couldn't generate payload")
 		}
 
-		go spinner(ctx, 100*time.Millisecond, quit)
+		go spinner(cfg.ctx, 100*time.Millisecond, quit)
 		resp, err := request(cfg.client, b, cfg.key)
 		quit <- struct{}{}
 		if err != nil {
@@ -121,7 +120,7 @@ func loop(cfg config) error {
 		}
 
 		select {
-		case <-ctx.Done():
+		case <-cfg.ctx.Done():
 			return nil
 		default:
 			continue
