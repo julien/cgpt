@@ -91,6 +91,8 @@ func TestPayload(t *testing.T) {
 }
 
 func TestRequest(t *testing.T) {
+	err := errors.New("something went wrong")
+
 	tcs := []struct {
 		role  string
 		input string
@@ -101,8 +103,9 @@ func TestRequest(t *testing.T) {
 			role:  "user",
 			input: "foo",
 			doFn: func(req *http.Request) (*http.Response, error) {
-				return nil, errors.New("something went wrong")
+				return nil, err
 			},
+			err: err,
 		},
 		{
 			role:  "user",
@@ -147,14 +150,13 @@ func TestRequest(t *testing.T) {
 			msgs := make([]message, 0)
 
 			b, err := payload(&msgs, tc.role, tc.input)
-			if err != tc.err {
+			if err != nil {
 				t.Errorf("got: %v, want: %v", err, tc.err)
+
 			}
 
-			r, err := request(&mockClient{doFn: tc.doFn}, b, os.Getenv(key))
-
-			if tc.err == nil && r == nil {
-				t.Errorf("expected a response, got nil")
+			if _, err := request(&mockClient{doFn: tc.doFn}, b, os.Getenv(key)); err != tc.err {
+				t.Errorf("got: %v, want: %v", err, tc.err)
 			}
 
 		})
