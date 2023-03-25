@@ -23,6 +23,12 @@ func (m mockClient) Do(req *http.Request) (*http.Response, error) {
 	return m.doFn(req)
 }
 
+type noopWriter struct{}
+
+func (w noopWriter) Write(p []byte) (n int, err error) {
+	return 0, nil
+}
+
 func TestInput(t *testing.T) {
 	tcs := []struct {
 		s    string
@@ -216,6 +222,7 @@ func TestRun(t *testing.T) {
 				input: func() io.Reader {
 					return strings.NewReader("")
 				}(),
+				output: &noopWriter{},
 			},
 		},
 	}

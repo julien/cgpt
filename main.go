@@ -59,6 +59,7 @@ type (
 		ctx    context.Context
 		key    string
 		input  io.Reader
+		output io.Writer
 	}
 )
 
@@ -68,6 +69,7 @@ func main() {
 		ctx:    context.Background(),
 		key:    os.Getenv(key),
 		input:  os.Stdin,
+		output: os.Stdout,
 	}
 
 	if err := run(cfg); err != nil {
@@ -89,10 +91,10 @@ func loop(cfg config) error {
 		quit = make(chan struct{})
 	)
 
-	fmt.Println("enter your question, and type ENTER")
+	fmt.Fprintln(cfg.output, "enter your question, and type ENTER")
 
 	for {
-		fmt.Print("> ")
+		fmt.Fprint(cfg.output, "> ")
 		txt, err := input(cfg.input)
 		if err != nil {
 			return errors.New("couldn't scan user input")
@@ -111,7 +113,7 @@ func loop(cfg config) error {
 		}
 
 		c := resp.Choices[0].Message.Content
-		fmt.Printf("%s\n\n", c)
+		fmt.Fprintf(cfg.output, "%s\n\n", c)
 
 		b, err = payload(&msgs, resp.Choices[0].Message.Role, c)
 		if err != nil {
