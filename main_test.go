@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -219,9 +218,7 @@ func TestRun(t *testing.T) {
 						},
 					}
 				}(),
-				input: func() io.Reader {
-					return strings.NewReader("")
-				}(),
+				input:  strings.NewReader(""),
 				output: &noopWriter{},
 			},
 		},
