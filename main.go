@@ -18,6 +18,13 @@ const (
 	url = "https://api.openai.com/v1/chat/completions"
 )
 
+var (
+	errKeyNotSet      = errors.New("the OPENAI_API_KEY environment variable is not set")
+	errInvalidInput   = errors.New("couldn't scan user input")
+	errInvalidPayload = errors.New("couldn't generate payload")
+	errNoResults      = errors.New("couldn't fetch results")
+)
+
 type (
 	body struct {
 		Model    string     `json:"model"`
@@ -80,7 +87,7 @@ func main() {
 
 func run(cfg config) error {
 	if len(cfg.key) == 0 {
-		return errors.New("the OPENAI_API_KEY environment variable is not set")
+		return errKeyNotSet
 	}
 	return loop(cfg)
 }
@@ -97,19 +104,19 @@ func loop(cfg config) error {
 		fmt.Fprint(cfg.output, "> ")
 		txt, err := input(cfg.input)
 		if err != nil {
-			return errors.New("couldn't scan user input")
+			return errInvalidInput
 		}
 
 		b, err := payload(&msgs, "user", txt)
 		if err != nil {
-			return errors.New("couldn't generate payload")
+			return errInvalidPayload
 		}
 
 		go spinner(cfg.ctx, 100*time.Millisecond, quit)
 		resp, err := request(cfg.client, b, cfg.key)
 		quit <- struct{}{}
 		if err != nil {
-			return errors.New("couldn't fetch results")
+			return errNoResults
 		}
 
 		c := resp.Choices[0].Message.Content

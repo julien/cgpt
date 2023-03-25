@@ -61,6 +61,7 @@ func TestPayload(t *testing.T) {
 		role   string
 		input  string
 		output []byte
+		err    error
 	}{
 		{
 			role:   "user",
@@ -79,8 +80,8 @@ func TestPayload(t *testing.T) {
 	for i, tc := range tcs {
 		t.Run(fmt.Sprintf("TestCase%02d", i), func(t *testing.T) {
 			b, err := payload(&msgs, tc.role, tc.input)
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
+			if err != tc.err {
+				t.Errorf("got: %v, want: %v", err, tc.err)
 			}
 			if !bytes.Equal(b, tc.output) {
 				t.Errorf("got: %v, want: %v", b, tc.output)
@@ -93,8 +94,8 @@ func TestRequest(t *testing.T) {
 	tcs := []struct {
 		role  string
 		input string
-		fail  bool
 		doFn  func(req *http.Request) (*http.Response, error)
+		err   error
 	}{
 		{
 			role:  "user",
@@ -102,7 +103,6 @@ func TestRequest(t *testing.T) {
 			doFn: func(req *http.Request) (*http.Response, error) {
 				return nil, errors.New("something went wrong")
 			},
-			fail: true,
 		},
 		{
 			role:  "user",
@@ -147,16 +147,13 @@ func TestRequest(t *testing.T) {
 			msgs := make([]message, 0)
 
 			b, err := payload(&msgs, tc.role, tc.input)
-			if err != nil && !tc.fail {
-				t.Errorf("unexpected error: %v", err)
+			if err != tc.err {
+				t.Errorf("got: %v, want: %v", err, tc.err)
 			}
 
 			r, err := request(&mockClient{doFn: tc.doFn}, b, os.Getenv(key))
-			if err != nil && !tc.fail {
-				t.Errorf("unexpected error: %v", err)
-			}
 
-			if !tc.fail && r == nil {
+			if tc.err == nil && r == nil {
 				t.Errorf("expected a response, got nil")
 			}
 
@@ -167,12 +164,12 @@ func TestRequest(t *testing.T) {
 
 func TestRun(t *testing.T) {
 	tcs := []struct {
-		cfg  config
-		fail bool
+		cfg config
+		err error
 	}{
 		{
-			cfg:  config{},
-			fail: true,
+			cfg: config{},
+			err: errKeyNotSet,
 		},
 		{
 			cfg: config{
@@ -222,12 +219,40 @@ func TestRun(t *testing.T) {
 				output: &noopWriter{},
 			},
 		},
+		{
+			cfg: config{
+				key: os.Getenv(key),
+				ctx: func() context.Context {
+					ctx, cancelFunc := context.WithTimeout(context.Background(), 40*time.Millisecond)
+					defer cancelFunc()
+					return ctx
+				}(),
+				client: func() httpClient {
+					return mockClient{
+						doFn: func(req *http.Request) (*http.Response, error) {
+							bad := `{
+								"this":
+							}`
+
+							return &http.Response{
+								StatusCode: http.StatusOK,
+								Body:       ioutil.NopCloser(bytes.NewReader([]byte(bad))),
+							}, nil
+						},
+					}
+				}(),
+				input:  strings.NewReader(""),
+				output: &noopWriter{},
+			},
+			err: errNoResults,
+		},
 	}
 
 	for i, tc := range tcs {
 		t.Run(fmt.Sprintf("TestCase%02d", i), func(t *testing.T) {
-			if err := run(tc.cfg); err != nil && !tc.fail {
-				t.Errorf("unexpected error: %v", err)
+			err := run(tc.cfg)
+			if err != tc.err {
+				t.Errorf("got: %v, want: %v", err, tc.err)
 			}
 		})
 	}
