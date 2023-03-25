@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,7 +14,7 @@ import (
 )
 
 const (
-	openAIKey = "OPENAPI_KEY"
+	openAIKey = "OPENAI_KEY"
 	url       = "https://api.openai.com/v1/chat/completions"
 )
 
@@ -47,34 +48,53 @@ type (
 		Role    string `json:"role"`
 		Content string `json:"content"`
 	}
+
+	// an interface to make it easier to mock http.Client
+	httpClient interface {
+		Do(req *http.Request) (*http.Response, error)
+	}
+
+	config struct {
+		client httpClient
+		ctx    context.Context
+		key    string
+		input  io.Reader
+	}
 )
 
 func main() {
-	if err := run(); err != nil {
+	cfg := config{
+		client: http.DefaultClient,
+		ctx:    context.Background(),
+		key:    os.Getenv(openAIKey),
+		input:  os.Stdin,
+	}
+
+	if err := run(cfg); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}
 }
 
-func run() error {
-	key := os.Getenv(openAIKey)
-	if len(key) == 0 {
+func run(cfg config) error {
+	if len(cfg.key) == 0 {
 		return errors.New("the environment variable OPENAI_KEY is not set")
 	}
-	return loop(key)
+	return loop(cfg)
 }
 
-func loop(key string) error {
+func loop(cfg config) error {
 	var (
-		msgs   = make([]message, 0, 2)
-		quit   = make(chan struct{})
-		client = http.DefaultClient
+		msgs = make([]message, 0, 2)
+		quit = make(chan struct{})
 	)
-
 	fmt.Println("enter your question, and type ENTER")
+	ctx, cancelFunc := context.WithCancel(cfg.ctx)
+	defer cancelFunc()
 
 	for {
-		txt, err := input(os.Stdin)
+		fmt.Print("> ")
+		txt, err := input(cfg.input)
 		if err != nil {
 			return errors.New("couldn't scan user input")
 		}
@@ -84,14 +104,8 @@ func loop(key string) error {
 			return errors.New("couldn't generate payload")
 		}
 
-		req, err := request(b, key)
-
-		if err != nil {
-			return errors.New("couldn't generate request")
-		}
-
-		go spinner(100*time.Millisecond, quit)
-		resp, err := fetch(client, req)
+		go spinner(ctx, 100*time.Millisecond, quit)
+		resp, err := request(cfg.client, b, cfg.key)
 		quit <- struct{}{}
 		if err != nil {
 			return errors.New("couldn't fetch results")
@@ -105,16 +119,21 @@ func loop(key string) error {
 			fmt.Fprintf(os.Stderr, "couldn't update conversation: %v\n", err)
 			break
 		}
+
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+			continue
+		}
+
 	}
 	return nil
 }
 
-func input(w io.Reader) (string, error) {
-	fmt.Print("> ")
-
-	scanner := bufio.NewScanner(w)
+func input(r io.Reader) (string, error) {
+	scanner := bufio.NewScanner(r)
 	scanner.Scan()
-
 	if err := scanner.Err(); err != nil {
 		return "", err
 	}
@@ -123,13 +142,12 @@ func input(w io.Reader) (string, error) {
 
 func payload(msgs *[]message, role, input string) ([]byte, error) {
 	var (
-		msg message
+		msg = message{Role: role, Content: input}
 		b   body
 		s   []byte
 		err error
 	)
 
-	msg = message{Role: role, Content: input}
 	*msgs = append(*msgs, msg)
 	b = body{Model: "gpt-3.5-turbo", Messages: msgs}
 	s, err = json.Marshal(&b)
@@ -139,30 +157,20 @@ func payload(msgs *[]message, role, input string) ([]byte, error) {
 	return s, err
 }
 
-func request(payload []byte, key string) (*http.Request, error) {
+func request(client httpClient, payload []byte, key string) (*response, error) {
 	var (
-		reader *bytes.Reader
-		req    *http.Request
-		err    error
+		req  *http.Request
+		res  *http.Response
+		data response
+		err  error
 	)
 
-	reader = bytes.NewReader(payload)
-	req, err = http.NewRequest(http.MethodPost, url, reader)
+	req, err = http.NewRequest(http.MethodPost, url, bytes.NewReader(payload))
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("Authorization", "Bearer "+key)
 	req.Header.Set("Content-Type", "application/json")
-
-	return req, nil
-}
-
-func fetch(client *http.Client, req *http.Request) (*response, error) {
-	var (
-		res  *http.Response
-		data response
-		err  error
-	)
 
 	res, err = client.Do(req)
 	if err != nil {
@@ -174,10 +182,11 @@ func fetch(client *http.Client, req *http.Request) (*response, error) {
 	return &data, nil
 }
 
-func spinner(delay time.Duration, quit <-chan struct{}) {
+func spinner(ctx context.Context, delay time.Duration, quit <-chan struct{}) {
 	t := time.NewTicker(delay)
 	for {
 		select {
+		case <-ctx.Done():
 		case <-quit:
 			return
 		case <-t.C:
