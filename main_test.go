@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -14,25 +15,30 @@ import (
 	"time"
 )
 
+type mockClient struct {
+	doFn func(req *http.Request) (*http.Response, error)
+}
+
+func (m mockClient) Do(req *http.Request) (*http.Response, error) {
+	return m.doFn(req)
+}
+
 func TestInput(t *testing.T) {
 	tcs := []struct {
-		name string
 		s    string
 		fail bool
 	}{
 		{
-			name: "returns a string given valid input",
-			s:    "hello",
+			s: "hello",
 		},
 		{
-			name: "handles special characters '\n'",
 			s:    "\n",
 			fail: true,
 		},
 	}
 
-	for _, tc := range tcs {
-		t.Run(tc.name, func(t *testing.T) {
+	for i, tc := range tcs {
+		t.Run(fmt.Sprintf("TestCase%02d", i), func(t *testing.T) {
 			r := strings.NewReader(tc.s)
 			txt, err := input(r)
 			if err != nil {
@@ -47,20 +53,16 @@ func TestInput(t *testing.T) {
 
 func TestPayload(t *testing.T) {
 	tcs := []struct {
-		name   string
 		role   string
 		input  string
 		output []byte
-		fail   bool
 	}{
 		{
-			name:   "adds a message",
 			role:   "user",
 			input:  "foo",
 			output: []byte(`{"model":"gpt-3.5-turbo","messages":[{"role":"user","content":"foo"}]}`),
 		},
 		{
-			name:   "adds another message",
 			role:   "admin",
 			input:  "bar",
 			output: []byte(`{"model":"gpt-3.5-turbo","messages":[{"role":"user","content":"foo"},{"role":"admin","content":"bar"}]}`),
@@ -69,10 +71,10 @@ func TestPayload(t *testing.T) {
 
 	msgs := make([]message, 0, len(tcs))
 
-	for _, tc := range tcs {
-		t.Run(tc.name, func(t *testing.T) {
+	for i, tc := range tcs {
+		t.Run(fmt.Sprintf("TestCase%02d", i), func(t *testing.T) {
 			b, err := payload(&msgs, tc.role, tc.input)
-			if err != nil && !tc.fail {
+			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
 			if !bytes.Equal(b, tc.output) {
@@ -82,24 +84,14 @@ func TestPayload(t *testing.T) {
 	}
 }
 
-type mockClient struct {
-	doFn func(req *http.Request) (*http.Response, error)
-}
-
-func (m mockClient) Do(req *http.Request) (*http.Response, error) {
-	return m.doFn(req)
-}
-
 func TestRequest(t *testing.T) {
 	tcs := []struct {
-		name  string
 		role  string
 		input string
 		fail  bool
 		doFn  func(req *http.Request) (*http.Response, error)
 	}{
 		{
-			name:  "handles errors",
 			role:  "user",
 			input: "foo",
 			doFn: func(req *http.Request) (*http.Response, error) {
@@ -108,7 +100,6 @@ func TestRequest(t *testing.T) {
 			fail: true,
 		},
 		{
-			name:  "handles response",
 			role:  "user",
 			input: "foo",
 			doFn: func(req *http.Request) (*http.Response, error) {
@@ -146,8 +137,8 @@ func TestRequest(t *testing.T) {
 		},
 	}
 
-	for _, tc := range tcs {
-		t.Run(tc.name, func(t *testing.T) {
+	for i, tc := range tcs {
+		t.Run(fmt.Sprintf("TestCase%02d", i), func(t *testing.T) {
 			msgs := make([]message, 0)
 
 			b, err := payload(&msgs, tc.role, tc.input)
@@ -172,16 +163,13 @@ func TestRequest(t *testing.T) {
 func TestRun(t *testing.T) {
 	tcs := []struct {
 		cfg  config
-		name string
 		fail bool
 	}{
 		{
-			name: "fails if OPENAI_KEY is not set",
 			cfg:  config{},
 			fail: true,
 		},
 		{
-			name: "works if OPENAI_KEY is set",
 			cfg: config{
 				key: os.Getenv(openAIKey),
 				ctx: func() context.Context {
@@ -226,15 +214,14 @@ func TestRun(t *testing.T) {
 					}
 				}(),
 				input: func() io.Reader {
-					return strings.NewReader("foo")
+					return strings.NewReader("")
 				}(),
 			},
 		},
 	}
 
-	for _, tc := range tcs {
-		t.Run(tc.name, func(t *testing.T) {
-
+	for i, tc := range tcs {
+		t.Run(fmt.Sprintf("TestCase%02d", i), func(t *testing.T) {
 			if err := run(tc.cfg); err != nil && !tc.fail {
 				t.Errorf("unexpected error: %v", err)
 			}
