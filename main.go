@@ -118,7 +118,6 @@ func loop(cfg config) error {
 		b, err = payload(&msgs, resp.Choices[0].Message.Role, c)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "couldn't update conversation: %v\n", err)
-			break
 		}
 
 		select {
