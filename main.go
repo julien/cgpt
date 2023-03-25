@@ -71,15 +71,13 @@ type (
 )
 
 func main() {
-	cfg := config{
+	if err := run(config{
 		client: http.DefaultClient,
 		ctx:    context.Background(),
 		key:    os.Getenv(key),
 		input:  os.Stdin,
 		output: os.Stdout,
-	}
-
-	if err := run(cfg); err != nil {
+	}); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}
