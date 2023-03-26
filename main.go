@@ -120,7 +120,7 @@ func loop(cfg config) error {
 		c := resp.Choices[0].Message.Content
 		fmt.Fprintf(cfg.output, "%s\n\n", c)
 
-		b, err = payload(&msgs, resp.Choices[0].Message.Role, c)
+		_, err = payload(&msgs, resp.Choices[0].Message.Role, c)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "couldn't update conversation: %v\n", err)
 		}
