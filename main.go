@@ -27,16 +27,16 @@ var (
 
 type (
 	body struct {
-		Model    string     `json:"model"`
 		Messages *[]message `json:"messages"`
+		Model    string     `json:"model"`
 	}
 
 	response struct {
 		ID      string    `json:"id"`
 		Object  string    `json:"object"`
 		Model   string    `json:"model"`
-		Usage   usage     `json:"usage"`
 		Choices []choices `json:"choices"`
+		Usage   usage     `json:"usage"`
 	}
 
 	usage struct {
@@ -64,9 +64,9 @@ type (
 	config struct {
 		client httpClient
 		ctx    context.Context
-		key    string
 		input  io.Reader
 		output io.Writer
+		key    string
 	}
 )
 

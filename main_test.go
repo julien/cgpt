@@ -58,10 +58,10 @@ func TestInput(t *testing.T) {
 
 func TestPayload(t *testing.T) {
 	tcs := []struct {
+		err    error
 		role   string
 		input  string
 		output []byte
-		err    error
 	}{
 		{
 			role:   "user",
@@ -94,10 +94,10 @@ func TestRequest(t *testing.T) {
 	err := errors.New("something went wrong")
 
 	tcs := []struct {
+		err   error
+		doFn  func(req *http.Request) (*http.Response, error)
 		role  string
 		input string
-		doFn  func(req *http.Request) (*http.Response, error)
-		err   error
 	}{
 		{
 			role:  "user",
@@ -166,8 +166,8 @@ func TestRequest(t *testing.T) {
 
 func TestRun(t *testing.T) {
 	tcs := []struct {
-		cfg config
 		err error
+		cfg config
 	}{
 		{
 			cfg: config{},
