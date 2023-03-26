@@ -133,7 +133,6 @@ func loop(cfg config) error {
 		}
 
 	}
-	return nil
 }
 
 func input(r io.Reader) (string, error) {
