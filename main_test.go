@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -79,7 +79,7 @@ func TestPayload(t *testing.T) {
 
 	for i, tc := range tcs {
 		t.Run(fmt.Sprintf("TestCase%02d", i+1), func(t *testing.T) {
-			b, err := payload(&msgs, tc.role, tc.input)
+			b, err := payload(&msgs, "gpt-3.5-turbo", tc.role, tc.input)
 			if err != tc.err {
 				t.Errorf("got: %v, want: %v", err, tc.err)
 			}
@@ -139,7 +139,7 @@ func TestRequest(t *testing.T) {
 
 				return &http.Response{
 					StatusCode: http.StatusOK,
-					Body:       ioutil.NopCloser(bytes.NewReader(b)),
+					Body:       io.NopCloser(bytes.NewReader(b)),
 				}, nil
 			},
 		},
@@ -149,7 +149,7 @@ func TestRequest(t *testing.T) {
 		t.Run(fmt.Sprintf("TestCase%02d", i+1), func(t *testing.T) {
 			msgs := make([]message, 0)
 
-			b, err := payload(&msgs, tc.role, tc.input)
+			b, err := payload(&msgs, "gpt-3.5-turbo", tc.role, tc.input)
 			if err != nil {
 				t.Errorf("got: %v, want: %v", err, tc.err)
 
@@ -212,7 +212,7 @@ func TestRun(t *testing.T) {
 
 							return &http.Response{
 								StatusCode: http.StatusOK,
-								Body:       ioutil.NopCloser(bytes.NewReader(b)),
+								Body:       io.NopCloser(bytes.NewReader(b)),
 							}, nil
 						},
 					}
@@ -238,7 +238,7 @@ func TestRun(t *testing.T) {
 
 							return &http.Response{
 								StatusCode: http.StatusOK,
-								Body:       ioutil.NopCloser(bytes.NewReader([]byte(bad))),
+								Body:       io.NopCloser(bytes.NewReader([]byte(bad))),
 							}, nil
 						},
 					}

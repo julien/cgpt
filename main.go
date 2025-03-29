@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"net/http"
@@ -25,56 +26,62 @@ var (
 	errNoResults      = errors.New("couldn't fetch results")
 )
 
-type (
-	body struct {
-		Messages *[]message `json:"messages"`
-		Model    string     `json:"model"`
-	}
+type body struct {
+	Messages *[]message `json:"messages"`
+	Model    string     `json:"model"`
+}
 
-	response struct {
-		ID      string    `json:"id"`
-		Object  string    `json:"object"`
-		Model   string    `json:"model"`
-		Choices []choices `json:"choices"`
-		Usage   usage     `json:"usage"`
-	}
+type response struct {
+	ID      string    `json:"id"`
+	Object  string    `json:"object"`
+	Model   string    `json:"model"`
+	Choices []choices `json:"choices"`
+	Usage   usage     `json:"usage"`
+}
 
-	usage struct {
-		PromptTokens     int32 `json:"prompt_tokens"`
-		CompletionTokens int32 `json:"completion_tokens"`
-		TotalTokens      int32 `json:"total_tokens"`
-	}
+type usage struct {
+	PromptTokens     int32 `json:"prompt_tokens"`
+	CompletionTokens int32 `json:"completion_tokens"`
+	TotalTokens      int32 `json:"total_tokens"`
+}
 
-	choices struct {
-		Message      message `json:"message"`
-		FinishReason string  `json:"finish_reason"`
-		Index        int     `json:"index"`
-	}
+type choices struct {
+	Message      message `json:"message"`
+	FinishReason string  `json:"finish_reason"`
+	Index        int     `json:"index"`
+}
 
-	message struct {
-		Role    string `json:"role"`
-		Content string `json:"content"`
-	}
+type message struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+}
 
-	// an interface to make it easier to mock http.Client
-	httpClient interface {
-		Do(req *http.Request) (*http.Response, error)
-	}
+// an interface to make it easier to mock http.Client
+type httpClient interface {
+	Do(req *http.Request) (*http.Response, error)
+}
 
-	config struct {
-		client httpClient
-		ctx    context.Context
-		input  io.Reader
-		output io.Writer
-		key    string
-	}
-)
+type config struct {
+	client httpClient
+	ctx    context.Context
+	input  io.Reader
+	output io.Writer
+	key    string
+	model  string
+}
 
 func main() {
+	// available models (03/2025):
+	// gpt-4-turbo, gpt-3.5-turbo-0125, gpt-4-turbo-vision, gpt-4-turbo-instruct
+	var model string
+	flag.StringVar(&model, "model", "gpt-4-turbo", "OpenAI model to use")
+	flag.Parse()
+
 	if err := run(config{
 		client: http.DefaultClient,
 		ctx:    context.Background(),
 		key:    os.Getenv(key),
+		model:  model,
 		input:  os.Stdin,
 		output: os.Stdout,
 	}); err != nil {
@@ -105,7 +112,7 @@ func loop(cfg config) error {
 			return errInvalidInput
 		}
 
-		b, err := payload(&msgs, "user", txt)
+		b, err := payload(&msgs, cfg.model, "user", txt)
 		if err != nil {
 			return errInvalidPayload
 		}
@@ -120,7 +127,7 @@ func loop(cfg config) error {
 		c := resp.Choices[0].Message.Content
 		fmt.Fprintf(cfg.output, "%s\n\n", c)
 
-		_, err = payload(&msgs, resp.Choices[0].Message.Role, c)
+		_, err = payload(&msgs, cfg.model, resp.Choices[0].Message.Role, c)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "couldn't update conversation: %v\n", err)
 		}
@@ -144,7 +151,7 @@ func input(r io.Reader) (string, error) {
 	return scanner.Text(), nil
 }
 
-func payload(msgs *[]message, role, input string) ([]byte, error) {
+func payload(msgs *[]message, model, role, input string) ([]byte, error) {
 	var (
 		msg = message{Role: role, Content: input}
 		b   body
@@ -153,7 +160,7 @@ func payload(msgs *[]message, role, input string) ([]byte, error) {
 	)
 
 	*msgs = append(*msgs, msg)
-	b = body{Model: "gpt-3.5-turbo", Messages: msgs}
+	b = body{Model: model, Messages: msgs}
 	s, err = json.Marshal(&b)
 	if err != nil {
 		return nil, err
