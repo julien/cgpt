@@ -1,0 +1,8 @@
+A program that talks to the OpenAI (chat) API, AKA ChatGPT.
+You'll need an API key, which can be generated at: https://platform.openai.com/account/api-keys
+
+Make sure you have Go(https://go.dev) installed, and run the program with
+go run .  # or go run main.go
+
+Run tests with:
+go test ./... -count=1 -cover -coverprofile=cov.txt -race -v
